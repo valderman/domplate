@@ -46,15 +46,14 @@
 --   for a rather clumsy context file format is included in
 --   "Text.Domplate.ContextParser".
 module Text.Domplate (
-    Monoid (..),
-    Template, Context, Value (..), Key,
+    Text, Monoid, Template, Context, Value (..), Key,
     parseTemplate, replace,
-    add, remove, fromList, Text.Domplate.Context.lookup, empty, size,
+    add, remove, fromList, Text.Domplate.Context.lookup, empty, size, (<>),
     compile
   ) where
 import Control.Applicative hiding (empty)
 import Data.Monoid
-import Data.Text (pack, unpack)
+import Data.Text (Text, pack, unpack)
 import Text.Domplate.Context
 import Text.Domplate.ContextParser
 import Text.Domplate.Replace
