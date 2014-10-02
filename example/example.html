@@ -3,7 +3,7 @@
 </head>
 <body>
   <h1 class="pageheading" insert="heading"></h1>
-  <div class="allposts" forall="post">
+  <div class="post" forall="post">
     <h1 class="posttitle" insert="post.title"></h1>
     <div when:?post.tag:class="postcontent"
          unless:?post.tag:class="postcontent no_tags"

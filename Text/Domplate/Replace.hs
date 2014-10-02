@@ -118,7 +118,7 @@ replace (Template template) context =
             _          -> typeError key "bool" (typeOf v)
 
         handleForall acc tag@(TagOpen name _) key tags = do
-          let t = takeUntilClose name tags
+          let t = tag:takeUntilClose name tags ++ [TagClose name]
               rest = dropUntilClose name tags
               k = case key of
                     Strong k -> k
@@ -127,7 +127,7 @@ replace (Template template) context =
           case v of
             List l -> do
               outs <- mapM (forallIter t k (length l-1)) (zip [0..] l)
-              step (TagClose name:concat (reverse (outs)) ++ tag:acc) rest
+              step (concat (reverse (outs)) ++ acc) rest
             _ -> do
               typeError key "list" (typeOf v)
 
