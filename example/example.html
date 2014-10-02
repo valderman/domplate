@@ -3,16 +3,15 @@
 </head>
 <body>
   <h1 class="pageheading" insert="heading"></h1>
-    <div class="allposts" forall="post">
-      <h1 class="posttitle" insert="post.title"></h1>
-      <div when:?post.tag:class="postcontent"
-           unless:?post.tag:class="postcontent no_tags"
-           insert="post.content"></div>
-      <span when="?post.tag">Tags:</span>
-      <span class="alltags" forall="?post.tag">
-        <replace with="post.tag"><span unless="?_last">, </span>
-      </span>
-    </div>
+  <div class="allposts" forall="post">
+    <h1 class="posttitle" insert="post.title"></h1>
+    <div when:?post.tag:class="postcontent"
+         unless:?post.tag:class="postcontent no_tags"
+         insert="post.content"></div>
+    <span when="?post.tag">Tags:</span>
+    <span class="alltags" forall="?post.tag">
+      <replace with="post.tag"><span unless="?_last">, </span>
+    </span>
   </div>
 </body>
 </html>

@@ -127,7 +127,7 @@ replace (Template template) context =
           case v of
             List l -> do
               outs <- mapM (forallIter t k (length l-1)) (zip [0..] l)
-              step (concat (reverse outs) ++ acc) rest
+              step (TagClose name:concat (reverse (outs)) ++ tag:acc) rest
             _ -> do
               typeError key "list" (typeOf v)
 
