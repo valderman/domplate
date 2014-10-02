@@ -21,8 +21,9 @@ data InternalKey = Weak [Key] | Strong [Key]
 -- | Perform substitutions on the given template using the given context.
 replace :: Template -> Context -> Either String T.Text
 replace (Template template) context =
-    renderTags . reverse <$> replace' template context
+    renderTagsOptions opts . reverse <$> replace' template context
   where
+    opts = renderOptions {optEscape = id}
     replace' ts ctx =
         step [] ts
       where
