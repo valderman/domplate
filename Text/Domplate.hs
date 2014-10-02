@@ -3,22 +3,29 @@
 --   attributes are stripped from the HTML. The following attributes are
 --   recognized:
 --
---   @insert="identifier"@ - replace the tag's contents with the value bound to
---   @identifier@ in the substitution context.
---
---   @when="identifier"@ - only render this tag if @identifier@ is set to true
---   in the substitution context.
---
---   @unless="identifier"@ - the dual of @when@; only render this tag if
---   @identifier@ is set to false in the substitution context.
---
---   @forall="identifier"@ - render this tag and its contents once for each
---   element in the list bound to @identifier@ in the substitution context.
---   The contents of the element may refer to the current iteration's value of
---   @identifier@ by that same name.
+--     * @insert="identifier"@ - replace the tag's contents with the value
+--       bound to @identifier@ in the substitution context.
+--     * @when="identifier"@ - only render this tag if @identifier@ is set to
+--       true in the substitution context.
+--     * @unless="identifier"@ - the dual of @when@; only render this tag if
+--       @identifier@ is set to false in the substitution context.
+--     * @forall="identifier"@ - render this tag and its contents once for each
+--       element in the list bound to @identifier@ in the substitution context.
+--       The contents of the element may refer to the current iteration's value
+--       of @identifier@ by that same name.
 --
 --   Additionally, the special @replace@ tag will be replaced by whatever is
 --   bound to its @with@ attribute: @\<replace with="identifier"\>@.
+--
+--   Substitution can also be performed on the attributes of tags. The
+--   following attribute substitutions are recognized:
+--
+--     * @when:identifier:attr="value"@ - only include @attr@ is @identifier@
+--       is set to true in the substitution context.
+--     * @unless:identifier:attr="value"@ - only include @attr@ is @identifier@
+--       is set to false in the substitution context.
+--     * @insert:identifier:attr="value"@ - overwrite the value of @attr@ with
+--       whatever @identifier@ is bound to in the substitution context.
 --
 --   Contexts can be nested, in which case nested keys are separated by
 --   periods, as in @parent.child.grandchild@. Keys may be prefixed with a

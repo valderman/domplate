@@ -4,6 +4,7 @@ import Prelude as P
 import Control.Applicative hiding (empty)
 import qualified Data.Text as T
 import qualified Data.Map as M
+import Data.Maybe (catMaybes)
 import Text.HTML.TagSoup
 import Text.Domplate.Context
 import Text.Domplate.ContextParser
@@ -25,11 +26,16 @@ replace (Template template) context =
     replace' ts ctx =
         step [] ts
       where
-        step :: [Tag T.Text] -> [Tag T.Text] -> Either String [Tag T.Text]
-        step acc (tag@(TagOpen "replace" attrs):tags)
+        step acc (TagOpen name attrs : tags) = do
+          attrs' <- catMaybes <$> mapM replaceAttr attrs
+          step2 acc (TagOpen name attrs' : tags)
+        step acc t = do
+          step2 acc t
+
+        step2 acc (tag@(TagOpen "replace" attrs):tags)
           | Just key <- P.lookup "with" attrs =
             handleReplace acc tag (mkKey key) tags
-        step acc (tag@(TagOpen _ attrs):tags)
+        step2 acc (tag@(TagOpen _ attrs):tags)
           | Just key <- P.lookup "insert"  attrs =
             handleInsert acc (stripAttr "insert" tag) (mkKey key) tags
           | Just key <- P.lookup "forall"  attrs =
@@ -38,8 +44,37 @@ replace (Template template) context =
             handleWhen acc (stripAttr "when" tag) (mkKey key) tags
           | Just key <- P.lookup "unless"  attrs =
             handleUnless acc (stripAttr "unless" tag) (mkKey key) tags
-        step acc (tag:tags) = step (tag : acc) tags
-        step acc []         = return acc
+        step2 acc (tag:tags) = step (tag : acc) tags
+        step2 acc []         = return acc
+
+        -- Substitute attributes when/unless/insert:id:attr
+        replaceAttr a@(k, val) =
+          case T.splitOn ":" k of
+            ["when", key, attr] -> do
+              v <- nestedLookup (Bool False) (mkKey key) ctx
+              case v of
+                Bool True  -> return (Just (attr, val))
+                Bool False -> return Nothing
+                List []    -> return Nothing
+                List _     -> return (Just (attr, val))
+                _          -> typeError (mkKey key) "bool" (typeOf v)
+            ["unless", key, attr] -> do
+              v <- nestedLookup (Bool False) (mkKey key) ctx
+              case v of
+                Bool True  -> return Nothing
+                Bool False -> return (Just (attr, val))
+                List []    -> return (Just (attr, val))
+                List _     -> return Nothing
+                _          -> typeError (mkKey key) "bool" (typeOf v)
+            ["insert", key, attr] -> do
+              v <- nestedLookup (Text "") (mkKey key) ctx
+              case v of
+                Bool True  -> return (Just (attr, "true"))
+                Bool False -> return (Just (attr, "false"))
+                Text s     -> return (Just (attr, s))
+                _          -> typeError (mkKey key) "bool" (typeOf v)
+            _ -> do
+              return $ Just a
 
         mkKey k
           | T.head k == '?' = Weak $ T.splitOn "." $ T.tail k
