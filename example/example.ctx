@@ -1,0 +1,26 @@
+heading: Page heading
+
+post:
+--
+  title: First post
+  content:
+    Dear diary, this is my first post.
+    Blogging, yay!
+
+  tag:
+  --
+    first!
+--
+  title: Second post
+  content: This post is short because I have nothing to say.
+--
+  title: Last post
+  content:
+    I guess blogging isn't for me.
+
+    Oh well, it was fun while it lasted.
+  tag:
+  --
+    farewell
+  --
+    sad

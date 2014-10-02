@@ -1,0 +1,16 @@
+<html>
+<head>
+</head>
+<body>
+  <h1 class="pageheading" insert="heading"></h1>
+    <div class="allposts" forall="post">
+      <h1 class="posttitle" insert="post.title"></h1>
+      <div class="postcontent" insert="post.content"></div>
+      <span when="?post.tag">Tags:</span>
+      <span class="alltags" forall="?post.tag">
+        <replace with="post.tag"><span unless="?_last">, </span>
+      </span>
+    </div>
+  </div>
+</body>
+</html>
