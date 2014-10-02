@@ -9,7 +9,7 @@
          unless:?post.tag:class="postcontent no_tags"
          insert="post.content"></div>
     <span when="?post.tag">Tags:</span>
-    <span class="alltags" forall="?post.tag">
+    <span class="tag" forall="?post.tag">
       <replace with="post.tag"><span unless="?_last">, </span>
     </span>
   </div>
