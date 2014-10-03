@@ -1,21 +1,15 @@
 module Text.Domplate.Context where
 import qualified Data.Text as T
-import qualified Data.Map as M
+import qualified Data.HashMap.Strict as M
+import Data.ByteString (ByteString)
+import Data.Yaml
 import Data.Monoid
 
 -- | A key to be read from the context.
 type Key = T.Text
 
--- | A typed domplate value. May be either a string or a boolean.
-data Value
-  = Text !T.Text
-  | Bool !Bool
-  | List ![Value]
-  | Map  !Context
-    deriving Show
-
 -- | An Unplate context. A simple mapping from keys to values.
-newtype Context = Ctx (M.Map Key Value)
+newtype Context = Ctx (M.HashMap Key Value)
   deriving Show
 
 instance Monoid Context where
@@ -23,23 +17,27 @@ instance Monoid Context where
   mappend (Ctx a) (Ctx b) = Ctx $ M.union a b
   mconcat = Ctx . M.unions . map (\(Ctx ctx) -> ctx)
 
--- | Lookup a value in the topmost context.
-lookup :: Key -> Context -> Maybe Value
-lookup k (Ctx m) = M.lookup k m
-
 typeOf :: Value -> String
-typeOf (Text _) = "text"
-typeOf (Bool _) = "boolean"
-typeOf (List _) = "list"
-typeOf (Map _)  = "map"
+typeOf (String _) = "text"
+typeOf (Number _) = "number"
+typeOf (Bool _)   = "boolean"
+typeOf (Array _)  = "array"
+typeOf (Object _) = "object"
+typeOf (Null)     = "null"
 
-showBool :: Bool -> String
-showBool True  = "true"
-showBool False = "false"
+-- | Create a context from a JSON object. Throws an error if the value is not
+--   an object.
+fromJSON :: Value -> Context
+fromJSON (Object o) = Ctx o
+fromJSON _          = error "Tried to make a context out of a non-object!"
 
 -- | Create a context from a list mapping keys to values.
 fromList :: [(Key, Value)] -> Context
 fromList = Ctx . M.fromList
+
+-- | Create a JSON object from a context.
+toValue :: Context -> Value
+toValue (Ctx ctx) = Object ctx
 
 -- | Add a new value to the given context. If the value already exists, it is
 --   overwritten.
@@ -54,7 +52,20 @@ remove k (Ctx ctx) = Ctx $ M.delete k ctx
 empty :: Context
 empty = Ctx M.empty
 
+-- | Look up a value in the top level context.
+lookup :: Key -> Context -> Maybe Value
+lookup key (Ctx m) = M.lookup key m
+
 -- | Get the size of the context. Nested contexts count a single element,
 --   regardless of their size.
 size :: Context -> Int
 size (Ctx m) = M.size m
+
+-- | Parse a context from a YAML-formatted 'ByteString'.
+parseContext :: ByteString -> Either String Context
+parseContext bs = do
+  val <- decodeEither bs
+  case val of
+    Object ctx -> return $ Ctx ctx
+    _          -> Left "Decoded value was not an object!"
+

@@ -35,35 +35,40 @@
 --   different value types are as follows:
 --
 --     * bool: false
---     * text: ""
---     * list: []
---     * map: {}
+--     * string: ""
+--     * array: []
+--     * object: {}
+--
+--   As numbers are treated just like strings, they have an empty string as
+--   their default value as well.
 --
 --   In general, values used as text must be declared text by the context and
 --   so on, but the following coercions are permitted:
 --
 --     * bool to string
---     * list to bool
+--     * array to bool
 --
---   Coercion of list to bool, with the empty list being considered false and
---   all other lists considered true, is permitted to allow templates to take
+--   Coercion of array to bool, with the empty list being considered false and
+--   all other list considered true, is permitted to allow templates to take
 --   special action in the case of an empty list.
 --
---   While it is highly recommended to build contexts programatically, a parser
---   for a rather clumsy context file format is included in
---   "Text.Domplate.ContextParser".
+--   Contexts may be constructed programatically using the provided
+--   combinators, converted from JSON objects or lists of key-value pairs, or
+--   parsed from a YAML-formatted string using 'parseContext'.
 module Text.Domplate (
     Text, Monoid, Template, Context, Value (..), Key,
     parseTemplate, replace,
     add, remove, fromList, Text.Domplate.Context.lookup, empty, size, (<>),
+    parseContext,
     compile
   ) where
 import Control.Applicative hiding (empty)
 import Data.Monoid
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text)
+import Data.Yaml (Value (..))
 import Text.Domplate.Context
-import Text.Domplate.ContextParser
 import Text.Domplate.Replace
+import qualified Data.ByteString as BS (readFile, writeFile)
 
 -- | Compile a template using a context parsed from a context file.
 --   Throws an error if context parsing or substitution fails.
@@ -72,10 +77,10 @@ compile :: FilePath -- ^ Template file.
         -> FilePath -- ^ Output file.
         -> IO ()
 compile template context outfile = do
-  t <- parseTemplate . pack <$> readFile template
-  ec <- parseContext . pack <$> readFile context
+  t <- parseTemplate <$> BS.readFile template
+  ec <- parseContext <$> BS.readFile context
   case fmapL show ec >>= replace t of
-    Right s -> writeFile outfile $ unpack s
+    Right s -> BS.writeFile outfile s
     Left e  -> error e
 
 fmapL :: (a -> b) -> Either a c -> Either b c

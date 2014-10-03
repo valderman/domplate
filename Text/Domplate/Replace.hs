@@ -1,27 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Text.Domplate.Replace (Template, parseTemplate, replace) where
-import Prelude as P
-import Control.Applicative hiding (empty)
+import Prelude  hiding (lookup)
+import qualified Prelude as P
 import qualified Data.Text as T
-import qualified Data.Map as M
+import qualified Data.Vector as V
+import Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import Control.Applicative hiding (empty)
 import Data.Maybe (catMaybes)
 import Text.HTML.TagSoup
 import Text.Domplate.Context
-import Text.Domplate.ContextParser
+import Data.Yaml
+import Data.ByteString (ByteString)
 
 -- | A domplate template.
 newtype Template = Template [Tag T.Text]
 
 -- | Parse an HTML5 string into a template.
-parseTemplate :: T.Text -> Template
-parseTemplate = Template . parseTags
+parseTemplate :: ByteString -> Template
+parseTemplate = Template . parseTags . decodeUtf8
 
 data InternalKey = Weak [Key] | Strong [Key]
 
--- | Perform substitutions on the given template using the given context.
-replace :: Template -> Context -> Either String T.Text
-replace (Template template) context =
-    renderTagsOptions opts . reverse <$> replace' template context
+-- | Perform substitutions on the given template using the given context,
+--   returning a 'ByteString'.
+replace :: Template -> Context -> Either String ByteString
+replace = genericReplace encodeUtf8
+
+-- | Perform substitutions on the given template using the given context,
+--   returning a 'T.Text'.
+replaceText :: Template -> Context -> Either String T.Text
+replaceText = genericReplace id
+
+genericReplace :: (T.Text -> a) -> Template -> Context -> Either String a
+genericReplace conv (Template template) context =
+    conv . renderTagsOptions opts . reverse <$> replace' template context
   where
     opts = renderOptions {optEscape = id}
     replace' ts ctx =
@@ -53,27 +65,21 @@ replace (Template template) context =
           case T.splitOn ":" k of
             ["when", key, attr] -> do
               v <- nestedLookup (Bool False) (mkKey key) ctx
-              case v of
-                Bool True  -> return (Just (attr, val))
-                Bool False -> return Nothing
-                List []    -> return Nothing
-                List _     -> return (Just (attr, val))
+              case truthOf v of
+                Just True  -> return (Just (attr, val))
+                Just False -> return Nothing
                 _          -> typeError (mkKey key) "bool" (typeOf v)
             ["unless", key, attr] -> do
               v <- nestedLookup (Bool False) (mkKey key) ctx
-              case v of
-                Bool True  -> return Nothing
-                Bool False -> return (Just (attr, val))
-                List []    -> return (Just (attr, val))
-                List _     -> return Nothing
+              case truthOf v of
+                Just True  -> return Nothing
+                Just False -> return (Just (attr, val))
                 _          -> typeError (mkKey key) "bool" (typeOf v)
             ["insert", key, attr] -> do
-              v <- nestedLookup (Text "") (mkKey key) ctx
-              case v of
-                Bool True  -> return (Just (attr, "true"))
-                Bool False -> return (Just (attr, "false"))
-                Text s     -> return (Just (attr, s))
-                _          -> typeError (mkKey key) "bool" (typeOf v)
+              v <- nestedLookup (String "") (mkKey key) ctx
+              case stringOf v of
+                Just s -> return (Just (attr, s))
+                _      -> typeError (mkKey key) "string" (typeOf v)
             _ -> do
               return $ Just a
 
@@ -84,37 +90,29 @@ replace (Template template) context =
         stripAttr s (TagOpen t as) = TagOpen t [a | a <- as, fst a /= s]
 
         handleInsert acc tag@(TagOpen nm _) key tags = do
-          v <- nestedLookup (Text "") key ctx
-          case (dropUntilClose nm tags, v) of
-            (ts', Text val)   -> step (TagClose nm:TagText val:tag:acc) ts'
-            (ts', Bool True)  -> step (TagClose nm:TagText "true":tag:acc) ts'
-            (ts', Bool False) -> step (TagClose nm:TagText "false":tag:acc) ts'
-            _                 -> typeError key "text" (typeOf v)
+          v <- nestedLookup (String "") key ctx
+          case (dropUntilClose nm tags, stringOf v) of
+            (ts', Just val) -> step (TagClose nm:TagText val:tag:acc) ts'
+            _               -> typeError key "string" (typeOf v)
 
         handleReplace acc tag@(TagOpen name _) key tags = do
-          v <- nestedLookup (Text "") key ctx
-          case v of
-            Text val   -> step (TagText val : acc) tags
-            Bool True  -> step (TagText "true" : acc) tags
-            Bool False -> step (TagText "false" : acc) tags
-            _          -> typeError key "text" (typeOf v)
+          v <- nestedLookup (String "") key ctx
+          case stringOf v of
+            Just s -> step (TagText s : acc) tags
+            _      -> typeError key "string" (typeOf v)
 
         handleWhen acc tag@(TagOpen name _) key tags = do
           v <- nestedLookup (Bool False) key ctx
-          case v of
-            Bool True  -> step (tag : acc) tags
-            Bool False -> step acc (dropUntilClose name tags)
-            List []    -> step acc (dropUntilClose name tags)
-            List _     -> step (tag : acc) tags
+          case truthOf v of
+            Just True  -> step (tag : acc) tags
+            Just False -> step acc (dropUntilClose name tags)
             _          -> typeError key "bool" (typeOf v)
 
         handleUnless acc tag@(TagOpen name _) key tags = do
           v <- nestedLookup (Bool False) key ctx
-          case v of
-            Bool False -> step (tag : acc) tags
-            Bool True  -> step acc (dropUntilClose name tags)
-            List []    -> step (tag : acc) tags
-            List _     -> step acc (dropUntilClose name tags)
+          case truthOf v of
+            Just False -> step (tag : acc) tags
+            Just True  -> step acc (dropUntilClose name tags)
             _          -> typeError key "bool" (typeOf v)
 
         handleForall acc tag@(TagOpen name _) key tags = do
@@ -123,13 +121,14 @@ replace (Template template) context =
               k = case key of
                     Strong k -> k
                     Weak k   -> k
-          v <- nestedLookup (List []) key ctx
+          v <- nestedLookup (Array V.empty) key ctx
           case v of
-            List l -> do
-              outs <- mapM (forallIter t k (length l-1)) (zip [0..] l)
+            Array l -> do
+              outs <- mapM (forallIter t k (V.length l-1))
+                           (zip [0..] (V.toList l))
               step (concat (reverse (outs)) ++ acc) rest
             _ -> do
-              typeError key "list" (typeOf v)
+              typeError key "array" (typeOf v)
 
         forallIter t k lastIx (ix, v) = do
           ctx' <- nestedAdd k v ctx
@@ -141,19 +140,31 @@ replace (Template template) context =
                       else nestedAdd ["_last"] (Bool False) ctx''
           replace' t ctx'''
 
+truthOf :: Value -> Maybe Bool
+truthOf (Bool b)  = Just b
+truthOf (Array a) = Just $ V.null a
+truthOf _         = Nothing
+
+stringOf :: Value -> Maybe T.Text
+stringOf (String s)   = Just s
+stringOf (Bool True)  = Just "true"
+stringOf (Bool False) = Just "false"
+stringOf (Number n)   = Just $ T.pack $ show n
+stringOf _            = Nothing
+
 nestedAdd :: [Key] -> Value -> Context -> Either String Context
 nestedAdd key val ctx = go key ctx
   where
-    go [k] (Ctx m) = do
-      return $ Ctx $ M.insert k val m
-    go (k:ks) (Ctx m) = do
-      case M.lookup k m of
-        Just (Map ctx') -> do
-          ctx'' <- go ks ctx'
-          return $ Ctx $ M.insert k (Map ctx'') m
+    go [k] m = do
+      return $ add k val m
+    go (k:ks) m = do
+      case lookup k m of
+        Just (Object ctx') -> do
+          Ctx ctx'' <- go ks (Ctx ctx')
+          return $ add k (Object ctx'') m
         _ -> do
-          ctx' <- go ks empty
-          return $ Ctx $ M.insert k (Map ctx') m
+          Ctx ctx' <- go ks empty
+          return $ add k (Object ctx') m
     go _ _ = do
       notFoundError (Strong key)
 
@@ -164,14 +175,14 @@ nestedLookup def key = go key'
     (key', notFound) = case key of
           Weak k   -> (k, return def)
           Strong k -> (k, notFoundError key)
-    go [k] (Ctx m) =
-      case M.lookup k m of
+    go [k] m =
+      case lookup k m of
         Just v -> return v
         _      -> notFound
-    go (k:ks) (Ctx m) =
-      case M.lookup k m of
-        Just (Map m') -> go ks m'
-        _             -> notFound
+    go (k:ks) m =
+      case lookup k m of
+        Just (Object m') -> go ks (Ctx m')
+        _                -> notFound
     go _ _ =
       notFound
 
