@@ -10,7 +10,7 @@
          insert="post.content"></div>
     <span when="?post.tag">Tags:</span>
     <span class="tag" forall="?post.tag">
-      <replace with="post.tag"><span unless="?_last">, </span>
+      <span replace="post.tag"></span><span unless="?_last">, </span>
     </span>
   </div>
 </body>

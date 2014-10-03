@@ -45,18 +45,22 @@ genericReplace conv (Template template) context =
         step acc t = do
           step2 acc t
 
-        step2 acc (tag@(TagOpen "replace" attrs):tags)
-          | Just key <- P.lookup "with" attrs =
-            handleReplace acc tag (mkKey key) tags
         step2 acc (tag@(TagOpen _ attrs):tags)
           | Just key <- P.lookup "insert"  attrs =
             handleInsert acc (stripAttr "insert" tag) (mkKey key) tags
+
+          | Just key <- P.lookup "replace"  attrs =
+            handleReplace acc tag (mkKey key) tags
+
           | Just key <- P.lookup "forall"  attrs =
             handleForall acc (stripAttr "forall" tag) (mkKey key) tags
+
           | Just key <- P.lookup "when"    attrs =
             handleWhen acc (stripAttr "when" tag) (mkKey key) tags
+
           | Just key <- P.lookup "unless"  attrs =
             handleUnless acc (stripAttr "unless" tag) (mkKey key) tags
+
         step2 acc (tag:tags) = step (tag : acc) tags
         step2 acc []         = return acc
 
@@ -98,7 +102,7 @@ genericReplace conv (Template template) context =
         handleReplace acc tag@(TagOpen name _) key tags = do
           v <- nestedLookup (String "") key ctx
           case stringOf v of
-            Just s -> step (TagText s : acc) tags
+            Just s -> step (TagText s : acc) (dropUntilClose name tags)
             _      -> typeError key "string" (typeOf v)
 
         handleWhen acc tag@(TagOpen name _) key tags = do
@@ -221,9 +225,8 @@ dropUntilClose str = go 0
 
 voidTag :: T.Text -> Bool
 voidTag t = t `elem` [
-    "replace", "area", "base", "br", "col", "command",
-    "embed", "hr", "img", "input", "keygen", "link",
-    "meta", "param", "source", "track", "wbr"
+    "area", "base", "br", "col", "command", "embed", "hr", "img", "input",
+    "keygen", "link", "meta", "param", "source", "track", "wbr"
   ]
 
 -- | A type mismatch has occurred.

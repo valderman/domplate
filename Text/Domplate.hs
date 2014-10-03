@@ -5,6 +5,8 @@
 --
 --     * @insert="identifier"@ - replace the tag's contents with the value
 --       bound to @identifier@ in the substitution context.
+--     * @replace="identifier"@ - replace the whole tag and its contents with
+--       the value bound to @identifier@ in the substitution context.
 --     * @when="identifier"@ - only render this tag if @identifier@ is set to
 --       true in the substitution context.
 --     * @unless="identifier"@ - the dual of @when@; only render this tag if
@@ -13,9 +15,6 @@
 --       element in the list bound to @identifier@ in the substitution context.
 --       The contents of the element may refer to the current iteration's value
 --       of @identifier@ by that same name.
---
---   Additionally, the special @replace@ tag will be replaced by whatever is
---   bound to its @with@ attribute: @\<replace with="identifier"\>@.
 --
 --   Substitution can also be performed on the attributes of tags. The
 --   following attribute substitutions are recognized:
