@@ -39,30 +39,31 @@ genericReplace conv (Template template) context =
     replace' ts ctx =
         step [] ts
       where
+        -- Substitute tags and attributes for a list of tags.
         step acc (TagOpen name attrs : tags) = do
           attrs' <- catMaybes <$> mapM replaceAttr attrs
-          step2 acc (TagOpen name attrs' : tags)
+          substTag acc (TagOpen name attrs' : tags)
         step acc t = do
-          step2 acc t
+          substTag acc t
 
-        step2 acc (tag@(TagOpen _ attrs):tags)
-          | Just key <- P.lookup "insert"  attrs =
+        substTag acc (tag@(TagOpen _ attrs):tags)
+          | Just key <- P.lookup "insert" attrs =
             handleInsert acc (stripAttr "insert" tag) (mkKey key) tags
 
-          | Just key <- P.lookup "replace"  attrs =
+          | Just key <- P.lookup "replace" attrs =
             handleReplace acc tag (mkKey key) tags
 
-          | Just key <- P.lookup "forall"  attrs =
+          | Just key <- P.lookup "forall" attrs =
             handleForall acc (stripAttr "forall" tag) (mkKey key) tags
 
-          | Just key <- P.lookup "when"    attrs =
+          | Just key <- P.lookup "when" attrs =
             handleWhen acc (stripAttr "when" tag) (mkKey key) tags
 
-          | Just key <- P.lookup "unless"  attrs =
+          | Just key <- P.lookup "unless" attrs =
             handleUnless acc (stripAttr "unless" tag) (mkKey key) tags
 
-        step2 acc (tag:tags) = step (tag : acc) tags
-        step2 acc []         = return acc
+        substTag acc (tag:tags) = step (tag : acc) tags
+        substTag acc []         = return acc
 
         -- Substitute attributes when/unless/insert:id:attr
         replaceAttr a@(k, val) =
