@@ -210,19 +210,21 @@ takeUntilClose str = go 0
 
 -- | Drop tags until a matching closing tag is found. Drops the closing tag.
 dropUntilClose :: T.Text -> [Tag T.Text] -> [Tag T.Text]
-dropUntilClose str = go 0
-  where
-    go n (tag:tags) =
-      case tag of
-        TagOpen name _
-          | voidTag name -> go n tags
-          | otherwise    -> go (n+1) tags
-        TagClose name
-          | name == str && n == 0 -> tags
-          | otherwise             -> go (n-1) tags
-        _                         -> go n tags
-    go _ tags =
-      tags
+dropUntilClose str tags
+  | voidTag str = tags
+  | otherwise   = go 0 tags
+    where
+      go n (tag:tags) =
+        case tag of
+          TagOpen name _
+            | voidTag name -> go n tags
+            | otherwise    -> go (n+1) tags
+          TagClose name
+            | name == str && n == 0 -> tags
+            | otherwise             -> go (n-1) tags
+          _                         -> go n tags
+      go _ tags =
+        tags
 
 voidTag :: T.Text -> Bool
 voidTag t = t `elem` [
